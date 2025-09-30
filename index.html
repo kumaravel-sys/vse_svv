@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>📈 School Stock Market</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 0; padding: 0; background: #f4f4f4; }
+    header { background: #222; color: #fff; padding: 10px; text-align: center; }
+    .container { padding: 20px; }
+    .hidden { display: none; }
+    .stock-list, .portfolio, .admin, .leaderboard, .history, .financials { margin-top: 20px; }
+    .stock-item { padding: 10px; border: 1px solid #ccc; margin: 5px; background: #fff; cursor: pointer; }
+    button { padding: 8px 15px; margin: 5px; cursor: pointer; }
+    .dark { background: #111; color: #eee; }
+    .dark .stock-item { background: #222; color: #fff; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>📊 School Stock Market</h1>
+    <button onclick="toggleDark()">🌙 Toggle Dark Mode</button>
+  </header>
+
+  <div class="container">
+
+    <!-- Login -->
+    <div id="loginDiv">
+      <h2>Login</h2>
+      <input type="email" id="email" placeholder="Email (admin only)"><br><br>
+      <input type="password" id="password" placeholder="Password"><br><br>
+      <button onclick="login()">Login</button>
+    </div>
+
+    <!-- Dashboard -->
+    <div id="dashboard" class="hidden">
+      <h2 id="welcomeMsg"></h2>
+      <button onclick="logout()">Logout</button>
+
+      <!-- Search -->
+      <div>
+        <input type="text" id="searchSymbol" placeholder="Search NSE Symbol (ex: RELIANCE.NS)">
+        <button onclick="searchStock()">Search</button>
+      </div>
+
+      <!-- Stock List -->
+      <div class="stock-list" id="stockList">
+        <h3>Top Indian Stocks</h3>
+        <div class="stock-item" onclick="selectStock('RELIANCE.NS')">Reliance (RELIANCE.NS)</div>
+        <div class="stock-item" onclick="selectStock('TCS.NS')">TCS (TCS.NS)</div>
+        <div class="stock-item" onclick="selectStock('INFY.NS')">Infosys (INFY.NS)</div>
+        <div class="stock-item" onclick="selectStock('HDFCBANK.NS')">HDFC Bank (HDFCBANK.NS)</div>
+        <div class="stock-item" onclick="selectStock('ICICIBANK.NS')">ICICI Bank (ICICIBANK.NS)</div>
+        <div class="stock-item" onclick="selectStock('SBIN.NS')">SBI (SBIN.NS)</div>
+        <div class="stock-item" onclick="selectStock('ITC.NS')">ITC (ITC.NS)</div>
+        <div class="stock-item" onclick="selectStock('LT.NS')">L&T (LT.NS)</div>
+        <div class="stock-item" onclick="selectStock('HINDUNILVR.NS')">HUL (HINDUNILVR.NS)</div>
+        <div class="stock-item" onclick="selectStock('BHARTIARTL.NS')">Airtel (BHARTIARTL.NS)</div>
+      </div>
+
+      <!-- Chart -->
+      <div id="chartDiv"></div>
+
+      <!-- Buy/Sell -->
+      <div>
+        <h3 id="selectedStock">No Stock Selected</h3>
+        <p>Price: ₹<span id="stockPrice">0</span></p>
+        <input type="number" id="quantity" placeholder="Quantity">
+        <button onclick="buyStock()">Buy</button>
+        <button onclick="sellStock()">Sell</button>
+      </div>
+
+      <!-- Portfolio -->
+      <div class="portfolio">
+        <h3>My Portfolio (Balance: ₹<span id="balance"></span>)</h3>
+        <ul id="portfolioList"></ul>
+      </div>
+
+      <!-- Trade History -->
+      <div class="history">
+        <h3>Trade History</h3>
+        <ul id="historyList"></ul>
+      </div>
+
+      <!-- Leaderboard -->
+      <div class="leaderboard">
+        <h3>Leaderboard</h3>
+        <ul id="leaderboardList"></ul>
+      </div>
+
+      <!-- Financial Info -->
+      <div class="financials">
+        <h3>Financial Info</h3>
+        <pre id="financials"></pre>
+      </div>
+
+      <!-- Admin -->
+      <div class="admin hidden" id="adminDiv">
+        <h3>Admin Panel</h3>
+        <ul id="adminUsers"></ul>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Firebase + Finnhub -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.3/firebase-app.js";
+    import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } 
+      from "https://www.gstatic.com/firebasejs/10.12.3/firebase-auth.js";
+    import { getFirestore, doc, setDoc, getDoc, updateDoc, collection, getDocs } 
+      from "https://www.gstatic.com/firebasejs/10.12.3/firebase-firestore.js";
+
+    const firebaseConfig = {
+      // Import the functions you need from the SDKs you need
+import { initializeApp } from "firebase/app";
+import { getAnalytics } from "firebase/analytics";
+// TODO: Add SDKs for Firebase products that you want to use
+// https://firebase.google.com/docs/web/setup#available-libraries
+
+// Your web app's Firebase configuration
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+const firebaseConfig = {
+  apiKey: "AIzaSyCOGQz10Xhqms3QxSjPh6VK-uCpM2_aBps",
+  authDomain: "stockwebsite2.firebaseapp.com",
+  projectId: "stockwebsite2",
+  storageBucket: "stockwebsite2.firebasestorage.app",
+  messagingSenderId: "841744549547",
+  appId: "1:841744549547:web:662b67d54784e4445519ee",
+  measurementId: "G-5DTT0LYG94"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const analytics = getAnalytics(app);
+
+    const FINNHUB_KEY = "d3bm7n1r01qqg7bv706gd3bm7n1r01qqg7bv7070";
+    let selectedSymbol = null, currentPrice = 0, userEmail = null;
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    async function fetchPrice(symbol) {
+      const res = await fetch(`https://finnhub.io/api/v1/quote?symbol=${symbol}&token=${FINNHUB_KEY}`);
+      const data = await res.json();
+      currentPrice = data.c;
+      document.getElementById("stockPrice").innerText = currentPrice;
+    }
+
+    function selectStock(symbol) {
+      selectedSymbol = symbol;
+      document.getElementById("selectedStock").innerText = symbol;
+      fetchPrice(symbol);
+      loadChart(symbol);
+      loadFinancials(symbol);
+    }
+
+    function searchStock() {
+      const symbol = document.getElementById("searchSymbol").value;
+      if(symbol) selectStock(symbol);
+    }
+
+    function loadChart(symbol) {
+      document.getElementById("chartDiv").innerHTML = "";
+      new TradingView.widget({
+        "container_id": "chartDiv",
+        "width": "100%",
+        "height": 400,
+        "symbol": "NSE:" + symbol.replace(".NS",""),
+        "interval": "D",
+        "theme": "light",
+        "style": "1",
+        "locale": "en",
+        "toolbar_bg": "#f1f3f6",
+        "enable_publishing": false,
+        "hide_legend": false
+      });
+    }
+
+    async function loadFinancials(symbol) {
+      const res = await fetch(`https://finnhub.io/api/v1/stock/metric?symbol=${symbol}&metric=all&token=${FINNHUB_KEY}`);
+      const data = await res.json();
+      document.getElementById("financials").innerText = JSON.stringify(data.metric, null, 2);
+    }
+
+    async function buyStock() {
+      const qty = parseInt(document.getElementById("quantity").value);
+      if(!selectedSymbol || qty <= 0) return alert("Invalid");
+      const userRef = doc(db, "users", userEmail);
+      let user = (await getDoc(userRef)).data();
+      const cost = qty * currentPrice;
+      if(user.balance < cost) return alert("Not enough balance");
+      user.balance -= cost;
+      user.portfolio[selectedSymbol] = (user.portfolio[selectedSymbol] || 0) + qty;
+      user.history.push(`Bought ${qty} ${selectedSymbol} @ ${currentPrice}`);
+      await setDoc(userRef, user);
+      renderUser(user);
+    }
+
+    async function sellStock() {
+      const qty = parseInt(document.getElementById("quantity").value);
+      if(!selectedSymbol || qty <= 0) return alert("Invalid");
+      const userRef = doc(db, "users", userEmail);
+      let user = (await getDoc(userRef)).data();
+      if((user.portfolio[selectedSymbol] || 0) < qty) return alert("Not enough shares");
+      user.balance += qty * currentPrice;
+      user.portfolio[selectedSymbol] -= qty;
+      user.history.push(`Sold ${qty} ${selectedSymbol} @ ${currentPrice}`);
+      await setDoc(userRef, user);
+      renderUser(user);
+    }
+
+    function renderUser(user) {
+      document.getElementById("balance").innerText = user.balance;
+      const pf = document.getElementById("portfolioList");
+      pf.innerHTML = "";
+      for(let s in user.portfolio) {
+        pf.innerHTML += `<li>${s}: ${user.portfolio[s]} shares</li>`;
+      }
+      const hist = document.getElementById("historyList");
+      hist.innerHTML = "";
+      user.history.forEach(h => hist.innerHTML += `<li>${h}</li>`);
+    }
+
+    async function login() {
+      const email = document.getElementById("email").value || "student@school.com";
+      const pass = document.getElementById("password").value;
+      if(pass !== "vse2k25" && !(email==="admin62vse.com" && pass==="adminvse2k25")) {
+        return alert("Wrong password");
+      }
+      if(email==="admin6@vse.com") {
+        await signInWithEmailAndPassword(auth, email, pass);
+      } else {
+        userEmail = email;
+        const userRef = doc(db, "users", userEmail);
+        const snap = await getDoc(userRef);
+        if(!snap.exists()) {
+          await setDoc(userRef, { balance: 20000, portfolio: {}, history: [] });
+        }
+        document.getElementById("loginDiv").classList.add("hidden");
+        document.getElementById("dashboard").classList.remove("hidden");
+        document.getElementById("welcomeMsg").innerText = "Welcome " + userEmail;
+        renderUser((await getDoc(userRef)).data());
+      }
+    }
+
+    function logout() {
+      userEmail = null;
+      signOut(auth);
+      location.reload();
+    }
+
+    onAuthStateChanged(auth, async (user) => {
+      if(user && user.email==="admin6@vse.com") {
+        document.getElementById("loginDiv").classList.add("hidden");
+        document.getElementById("dashboard").classList.remove("hidden");
+        document.getElementById("welcomeMsg").innerText = "Welcome Admin";
+        document.getElementById("adminDiv").classList.remove("hidden");
+        const usersSnap = await getDocs(collection(db, "users"));
+        const list = document.getElementById("adminUsers");
+        list.innerHTML = "";
+        usersSnap.forEach(u => {
+          const d = u.data();
+          list.innerHTML += `<li>${u.id} - Balance: ₹${d.balance}</li>`;
+        });
+      }
+    });
+
+    function toggleDark() {
+      document.body.classList.toggle("dark");
+    }
+  </script>
+
+  <!-- TradingView -->
+  <script src="https://s3.tradingview.com/tv.js"></script>
+</body>
+</html>
